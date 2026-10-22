@@ -1,0 +1,187 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LMS Real-Time Notifications</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f4f6f9;
+    }
+
+    .container {
+      background: white;
+      padding: 24px;
+      border-radius: 10px;
+    }
+
+    input, button {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px;
+      margin: 8px 0;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+      background: #2563eb;
+      color: white;
+    }
+
+    #status {
+      font-weight: bold;
+    }
+
+    #notifications {
+      padding-left: 20px;
+    }
+
+    li {
+      margin: 10px 0;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>LMS Notifications</h1>
+
+    <label for="token">JWT Authentication Token</label>
+    <input
+      id="token"
+      type="password"
+      placeholder="Paste your login token here"
+      autocomplete="off"
+    />
+
+    <label for="courseId">Course ID</label>
+    <input
+      id="courseId"
+      type="number"
+      min="1"
+      placeholder="Enter course ID"
+    />
+
+    <button id="connectBtn">Connect</button>
+    <button id="joinBtn">Join Course</button>
+    <button id="leaveBtn">Leave Course</button>
+
+    <p>Status: <span id="status">Disconnected</span></p>
+
+    <h2>Notifications</h2>
+    <ul id="notifications"></ul>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+
+  <script>
+    let socket = null;
+
+    const tokenInput = document.getElementById("token");
+    const courseInput = document.getElementById("courseId");
+    const status = document.getElementById("status");
+    const notifications = document.getElementById("notifications");
+
+    function addNotification(message) {
+      const item = document.createElement("li");
+      item.textContent = message;
+      notifications.prepend(item);
+    }
+
+    document.getElementById("connectBtn").addEventListener("click", () => {
+      const token = tokenInput.value.trim();
+
+      if (!token) {
+        alert("Please enter your JWT token");
+        return;
+      }
+
+      if (socket) {
+        socket.disconnect();
+      }
+
+      socket = io({
+        auth: { token }
+      });
+
+      socket.on("connect", () => {
+        status.textContent = "Connected";
+        addNotification("Connected to notification server");
+      });
+
+      socket.on("connect_error", (error) => {
+        status.textContent = "Connection failed";
+        addNotification("Connection error: " + error.message);
+      });
+
+      socket.on("disconnect", () => {
+        status.textContent = "Disconnected";
+      });
+
+      socket.on("roomJoined", (data) => {
+        addNotification(data.message);
+      });
+
+      socket.on("roomLeft", (data) => {
+        addNotification("Left course " + data.courseId);
+      });
+
+      socket.on("studentJoined", (data) => {
+        addNotification(data.message);
+      });
+
+      socket.on("newAssignment", (data) => {
+        addNotification(
+          "NEW ASSIGNMENT: " + data.title +
+          " | Course ID: " + data.courseId
+        );
+      });
+
+      socket.on("errorMessage", (data) => {
+        addNotification("Error: " + data.message);
+      });
+    });
+
+    document.getElementById("joinBtn").addEventListener("click", () => {
+      const courseId = Number(courseInput.value);
+
+      if (!socket || !socket.connected) {
+        alert("Connect first");
+        return;
+      }
+
+      if (!Number.isInteger(courseId) || courseId <= 0) {
+        alert("Enter a valid course ID");
+        return;
+      }
+
+      socket.emit("joinCourse", courseId);
+    });
+
+    document.getElementById("leaveBtn").addEventListener("click", () => {
+      const courseId = Number(courseInput.value);
+
+      if (!socket || !socket.connected) {
+        alert("Connect first");
+        return;
+      }
+
+      if (!Number.isInteger(courseId) || courseId <= 0) {
+        alert("Enter a valid course ID");
+        return;
+      }
+
+      socket.emit("leaveCourse", courseId);
+    });
+  </script>
+</body>
+</html>
